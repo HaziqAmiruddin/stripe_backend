@@ -83,5 +83,16 @@ app.get("/payment-methods/:uid", async (req, res) => {
   }
 });
 
+// index.js — add this route
+app.delete('/payment-methods/:paymentMethodId', async (req, res) => {
+  try {
+    await stripe.paymentMethods.detach(req.params.paymentMethodId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
