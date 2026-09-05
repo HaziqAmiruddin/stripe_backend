@@ -96,3 +96,59 @@ app.delete('/payment-methods/:paymentMethodId', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// index.js — add these
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = 'gemini-2.5-flash'; // free-tier-friendly model
+
+const SYSTEM_PROMPT = `You are a friendly customer support assistant for "Shopping Bakery App",
+a bakery e-commerce app selling cakes, donuts, cupcakes, cookies, and pastries.
+Help users with questions about orders, delivery, payment methods (credit card, FPX),
+returns, and general app usage. Keep answers short, warm, and practical.
+If you don't know something specific to this app, say so honestly and suggest
+they contact support via email instead of guessing.`;
+
+app.post('/support-chat', async (req, res) => {
+  try {
+    const { message, history } = req.body; // history: [{role: 'user'|'model', text: string}]
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'message is required' });
+    }
+
+    const contents = [
+      ...(history || []).map((h) => ({
+        role: h.role,
+        parts: [{ text: h.text }],
+      })),
+      { role: 'user', parts: [{ text: message }] },
+    ];
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Gemini API error:', data);
+      return res.status(500).json({ error: 'AI service error' });
+    }
+
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ??
+      "Sorry, I couldn't generate a response. Please try again.";
+
+    res.json({ reply });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
