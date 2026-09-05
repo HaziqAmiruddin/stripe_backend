@@ -99,7 +99,7 @@ app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // index.js — add these
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash'; // free-tier-friendly model
+const GEMINI_MODEL = 'gemini-3.5-flash'; // free-tier-friendly model
 
 const SYSTEM_PROMPT = `You are a friendly customer support assistant for "Shopping Bakery App",
 a bakery e-commerce app selling cakes, donuts, cupcakes, cookies, and pastries.
