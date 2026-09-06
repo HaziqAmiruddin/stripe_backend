@@ -189,3 +189,46 @@ app.post('/create-payment-intent', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+const XENDIT_SECRET_KEY = process.env.XENDIT_SECRET_KEY;
+
+app.post('/create-xendit-invoice', async (req, res) => {
+  try {
+    const { uid, amount, email } = req.body;
+
+    if (!uid || !amount) {
+      return res.status(400).json({ error: 'uid and amount are required' });
+    }
+
+    const externalId = `order-${uid}-${Date.now()}`;
+
+    const response = await fetch('https://api.xendit.co/v2/invoices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Basic ' + Buffer.from(`${XENDIT_SECRET_KEY}:`).toString('base64'),
+      },
+      body: JSON.stringify({
+        external_id: externalId,
+        amount: amount, // in RM (Xendit uses whole currency units, not cents)
+        payer_email: email || 'guest@example.com',
+        description: 'Shopping Bakery App Order',
+        currency: 'MYR',
+        success_redirect_url: 'https://your-app-domain.com/payment-success',
+        failure_redirect_url: 'https://your-app-domain.com/payment-failure',
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Xendit invoice error:', data);
+      return res.status(500).json({ error: 'Failed to create invoice' });
+    }
+
+    res.json({ invoiceUrl: data.invoice_url, externalId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
