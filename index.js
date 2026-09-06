@@ -83,7 +83,6 @@ app.get("/payment-methods/:uid", async (req, res) => {
   }
 });
 
-// index.js — add this route
 app.delete('/payment-methods/:paymentMethodId', async (req, res) => {
   try {
     await stripe.paymentMethods.detach(req.params.paymentMethodId);
@@ -97,9 +96,8 @@ app.delete('/payment-methods/:paymentMethodId', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-// index.js — add these
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-3.5-flash'; // free-tier-friendly model
+const GEMINI_MODEL = 'gemini-3.5-flash'; 
 
 const SYSTEM_PROMPT = `You are a friendly customer support assistant for "Shopping Bakery App",
 a bakery e-commerce app selling cakes, donuts, cupcakes, cookies, and pastries.
@@ -147,6 +145,45 @@ app.post('/support-chat', async (req, res) => {
       "Sorry, I couldn't generate a response. Please try again.";
 
     res.json({ reply });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/create-payment-intent', async (req, res) => {
+  try {
+    const { uid, amount } = req.body; // amount in the smallest currency unit (e.g. cents/sen)
+
+    if (!uid || !amount) {
+      return res.status(400).json({ error: 'uid and amount are required' });
+    }
+
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+    const stripeCustomerId = userDoc.data()?.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      return res.status(400).json({ error: 'No Stripe customer found for this user' });
+    }
+
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: stripeCustomerId },
+      { apiVersion: '2024-06-20' },
+    );
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount), // must be an integer (e.g. sen for MYR)
+      currency: 'myr',
+      customer: stripeCustomerId,
+      automatic_payment_methods: { enabled: true },
+    });
+
+    res.json({
+      paymentIntentClientSecret: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customerId: stripeCustomerId,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
